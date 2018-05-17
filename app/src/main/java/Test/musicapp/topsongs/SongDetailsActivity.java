@@ -2,14 +2,28 @@ package Test.musicapp.topsongs;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
+import android.util.Log;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import com.bumptech.glide.Glide;
+
+import java.util.Date;
 
 import Test.musicapp.R;
 import Test.musicapp.api.ApiService;
 import Test.musicapp.api.Track;
 import Test.musicapp.api.Tracks;
+import Test.musicapp.database.Favorite;
+import io.realm.Realm;
+import io.realm.RealmResults;
+import io.realm.Sort;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
@@ -22,6 +36,67 @@ public class SongDetailsActivity extends AppCompatActivity {
     public static final String TRACK = "track";
     public static final String ARTIST = "artist";
     public static final String TRACK_ID = "track_id";
+
+
+    String track;
+    String artist;
+    int trackId;
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch (item.getItemId()) {
+            case R.id. itemFavorite :
+                addRemoveFavorite();
+                return true ;
+            default :
+                return super .onOptionsItemSelected(item);
+        }
+    }
+    private void addRemoveFavorite() {
+        Realm realm = Realm. getDefaultInstance ();
+        Favorite favorite = realm
+                .where(Favorite. class )
+                .equalTo( "trackId" , trackId )
+                .findFirst();
+        if (favorite == null ) {
+            addToFavorites(realm);
+        } else {
+            removeFromFavorites(realm, favorite);
+        }
+    }
+    private void addToFavorites(Realm realm) {
+        realm.executeTransaction( new Realm.Transaction() {
+            @Override
+            public void execute( @NonNull Realm realm) {
+                Favorite favorite = realm.createObject(Favorite. class );
+                favorite.setArtist( artist );
+                favorite.setTrack( track );
+                favorite.setTrackId( trackId );
+                favorite.setDate( new Date());
+                Toast. makeText (SongDetailsActivity. this , "Dodano do ulubionych" ,
+                        Toast. LENGTH_SHORT ).show();
+            }
+        });
+    }
+    private void removeFromFavorites(Realm realm, final Favorite favorite) {
+        realm.executeTransaction( new Realm.Transaction() {
+            @Override
+            public void execute( @NonNull Realm realm) {
+                favorite .deleteFromRealm();
+                Toast. makeText (SongDetailsActivity. this , "Usunięto z ulubionych" ,
+                        Toast. LENGTH_SHORT ).show();
+            }
+        });
+    }
+
+
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        MenuInflater inflater = getMenuInflater();
+        inflater.inflate(R.menu.favorites_menu, menu);
+        return true ;
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -57,6 +132,7 @@ public class SongDetailsActivity extends AppCompatActivity {
             }
 
 
+
             private void showData(Track track) {
                 TextView tvAlbum = findViewById(R.id. tvAlbum );
                 TextView tvGenre = findViewById(R.id. tvGenre );
@@ -66,9 +142,28 @@ public class SongDetailsActivity extends AppCompatActivity {
                 tvGenre.setText(track. strGenre );
                 tvStyle.setText(track. strStyle );
                 tvDescription.setText(track. strDescriptionEN );
+
+
+                if (track. strTrackThumb != null && !track. strTrackThumb .isEmpty()) {
+                    ImageView ivThumb = findViewById(R.id. ivThumb );
+                    Glide. with ( SongDetailsActivity.this ).load(track. strTrackThumb ).into(ivThumb);
+                }
             }
 
 
         });
+        Realm realm = Realm. getDefaultInstance ();
+        RealmResults<Favorite> favorites = realm
+                .where(Favorite. class )
+                .sort( "date" , Sort. DESCENDING )
+                .findAll();
+        if (favorites.size() > 0 ) {
+            Toast. makeText ( this , "Pobrano ulubione" , Toast. LENGTH_SHORT ).show();
+            for (Favorite favorite : favorites) {
+                Log. d ( "FAV" , favorite.getArtist() + " - " + favorite.getTrack());
+            }
+        } else {
+            Toast. makeText ( this , "Brak ulubionych" , Toast. LENGTH_SHORT ).show();
+        }
     }
 }
